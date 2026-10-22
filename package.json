@@ -1,0 +1,17 @@
+{
+  "name": "siw-solana",
+  "version": "1.0.0",
+  "description": "Sign in with Solana: message format, ed25519 verification, replay guard, allowlist. Pure, no RPC.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/siw.mjs",
+  "exports": {
+    ".": "./src/siw.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
