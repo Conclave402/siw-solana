@@ -54,13 +54,14 @@ test("A1 valid: a correct signature inside the window and on the allowlist verif
   assert.deepEqual(r, { ok: true, reason: "ok" });
 });
 
-test("A2 wrong domain: the parsed message carries the domain so a caller can bind it", () => {
+test("A2 wrong domain: a message for another domain is rejected when the expected domain is given", () => {
   const { message, signature, address } = signed({ domain: "evil.example" });
-  const parsed = parseMessage(message);
-  assert.equal(parsed.domain, "evil.example");
-  // The module exposes the value; binding to the expected domain is the caller's check.
-  const r = verify({ message, signature, address, now: NOW, seen: new Set() });
-  assert.equal(r.ok, true);
+  const r = verify({ message, signature, address, domain: DOMAIN, now: NOW, seen: new Set() });
+  assert.deepEqual(r, { ok: false, reason: "wrong-domain" });
+  // Without an expected domain the signature still proves the address owns the text.
+  const noExpectation = verify({ message, signature, address, now: NOW, seen: new Set() });
+  assert.equal(noExpectation.ok, true);
+  assert.equal(parseMessage(message).domain, "evil.example");
 });
 
 test("A3 expired: a message past its expiry does not verify", () => {

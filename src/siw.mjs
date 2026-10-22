@@ -121,21 +121,29 @@ function ed25519Key(raw32) {
   return createPublicKey({ key: Buffer.concat([DER_PREFIX, raw32]), format: "der", type: "spki" });
 }
 
-// verify({message, signature, address, allowlist, now, seen}) -> {ok, reason}
+// verify({message, signature, address, allowlist, now, seen, domain}) -> {ok, reason}
 //
 // Reasons are single, stable strings so a caller can branch on them:
-//   ok | malformed-message | bad-signature | expired | not-yet-valid
-//   | replayed | not-allowed | bad-address | bad-signature-encoding
+//   ok | malformed-message | wrong-domain | bad-signature | expired
+//   | not-yet-valid | replayed | not-allowed | bad-address | bad-signature-encoding
 //
-// Order of checks is deliberate: shape, then signature (proves the address owns
-// the message), then time, then allowlist, then replay. A caller who wants the
-// replay guard to only fire for authentic messages gets that for free.
+// Order of checks is deliberate: shape, domain binding, address binding,
+// signature (proves the address owns the message), time, allowlist, then replay.
+// A caller who wants the replay guard to only fire for authentic messages gets
+// that for free.
+//
+// `domain` is optional. When supplied, the message must carry exactly that
+// domain, so a signature harvested from another site cannot be replayed here.
 export function verify(input) {
   if (!input || typeof input !== "object") return { ok: false, reason: "malformed-message" };
-  const { message, signature, address, allowlist, now, seen } = input;
+  const { message, signature, address, allowlist, now, seen, domain } = input;
 
   const parsed = parseMessage(message);
   if (!parsed) return { ok: false, reason: "malformed-message" };
+
+  if (domain !== undefined && domain !== null && parsed.domain !== domain) {
+    return { ok: false, reason: "wrong-domain" };
+  }
 
   // The message must name the address being authenticated, otherwise a valid
   // signature over someone else's message would sign us in as them.

@@ -22,14 +22,16 @@ const message = createMessage({
   expiresAt: 1700000600,
 });
 
-verify({ message, signature, address, allowlist, now, seen });
+verify({ message, signature, address, allowlist, now, seen, domain });
 // -> { ok: boolean, reason: string }
 ```
 
 `signature` is the base58 ed25519 signature over the exact message bytes.
 `allowlist` is optional (array of addresses). `seen` is optional (a `Set`, or a
 function `nonce => boolean`) used for replay protection. `now` is the current
-unix time in seconds.
+unix time in seconds. `domain` is optional: when supplied, the message must carry
+exactly that domain, so a signature harvested from another site cannot be
+replayed here.
 
 ## Reasons
 
@@ -39,6 +41,7 @@ Stable, single strings so a caller can branch on them:
 |---|---|
 | `ok` | valid |
 | `malformed-message` | the text is not a well formed message |
+| `wrong-domain` | an expected `domain` was supplied and the message names another |
 | `bad-address` | the message does not name the verified address, or it is not a 32 byte key |
 | `bad-signature-encoding` | the signature is not base58 or not 64 bytes |
 | `bad-signature` | the signature does not verify over the message |
