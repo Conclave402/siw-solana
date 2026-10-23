@@ -23,7 +23,15 @@ export function createMessage(params) {
   if (!params || typeof params !== "object") {
     throw new TypeError("createMessage requires an object");
   }
-  const { domain, address, nonce, issuedAt, expiresAt } = params;
+  // Field names: the spec names the fields (domain, address, nonce, issued at,
+  // expiry) but not the parameter keys, so the common spellings are accepted
+  // and written to the message under the canonical names.
+  const domain = params.domain;
+  const address = params.address;
+  const nonce = params.nonce;
+  const issuedAt = params.issuedAt ?? params.issued_at ?? params.issued;
+  const expiresAt = params.expiresAt ?? params.expirationTime ?? params.expires_at
+    ?? params.expires ?? params.expiry;
   const fields = { domain, address, nonce, issuedAt, expiresAt };
   for (const [k, v] of Object.entries(fields)) {
     if (typeof v !== "string" && typeof v !== "number") {
@@ -136,7 +144,8 @@ function ed25519Key(raw32) {
 // domain, so a signature harvested from another site cannot be replayed here.
 export function verify(input) {
   if (!input || typeof input !== "object") return { ok: false, reason: "malformed-message" };
-  const { message, signature, address, allowlist, now, seen, domain } = input;
+  const { message, signature, address, allowlist, now, seen } = input;
+  const domain = input.domain ?? input.expectedDomain ?? input.expected_domain;
 
   const parsed = parseMessage(message);
   if (!parsed) return { ok: false, reason: "malformed-message" };
@@ -180,6 +189,10 @@ export function verify(input) {
   if (seen !== undefined && seen !== null) {
     const isSeen = typeof seen === "function" ? seen : (n) => seen.has && seen.has(n);
     if (isSeen(parsed.nonce)) return { ok: false, reason: "replayed" };
+    // The nonce is consumed only on success, so the guard actually stops the
+    // second use of the same message and a refused attempt can be retried.
+    // A caller that passes a check-only store keeps the old behaviour.
+    if (typeof seen.add === "function") seen.add(parsed.nonce);
   }
 
   return { ok: true, reason: "ok" };

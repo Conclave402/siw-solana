@@ -121,3 +121,35 @@ test("A10 round trip: base58 encode/decode is exact and preserves leading zeros"
   assert.equal(base58Decode(base58Encode(b)).toString("hex"), b.toString("hex"));
   assert.equal(base58Encode(Buffer.alloc(0)), "");
 });
+
+test("A11 replay guard is real: the same seen store refuses the second use of one message", () => {
+  const { message, signature, address } = signed();
+  const seen = new Set();
+  const first = verify({ message, signature, address, now: NOW, seen });
+  assert.deepEqual(first, { ok: true, reason: "ok" });
+  const second = verify({ message, signature, address, now: NOW, seen });
+  assert.deepEqual(second, { ok: false, reason: "replayed" });
+  // And the store really holds the nonce the message names, not the signature.
+  assert.equal(seen.has(NONCE), true);
+  assert.equal(seen.has(signature), false);
+});
+
+test("A12 a refused message does not consume its nonce, so a corrected retry still works", () => {
+  const { message, signature, address } = signed();
+  const seen = new Set();
+  const denied = verify({ message, signature, address, allowlist: ["SomeOtherAddress111111111111111111111111111111"], now: NOW, seen });
+  assert.deepEqual(denied, { ok: false, reason: "not-allowed" });
+  assert.equal(seen.has(NONCE), false);
+  const allowed = verify({ message, signature, address, allowlist: [address], now: NOW, seen });
+  assert.deepEqual(allowed, { ok: true, reason: "ok" });
+});
+
+test("A13 field spellings: the spec names the fields, not the keys, so expiry and domain aliases are accepted", () => {
+  const message = createMessage({
+    domain: DOMAIN, address: ADDRESS, nonce: NONCE, issuedAt: ISSUED, expirationTime: EXPIRES,
+  });
+  const signature = base58Encode(cryptoSign(null, Buffer.from(message, "utf8"), priv));
+  assert.deepEqual(parseMessage(message), { domain: DOMAIN, address: ADDRESS, nonce: NONCE, issuedAt: ISSUED, expiresAt: EXPIRES });
+  const r = verify({ message, signature, address: ADDRESS, expectedDomain: DOMAIN, now: NOW, seen: new Set() });
+  assert.deepEqual(r, { ok: true, reason: "ok" });
+});
